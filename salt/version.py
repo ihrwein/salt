@@ -442,7 +442,7 @@ def __get_version(version, version_info):
 
 
 # Get additional version information if available
-__version__, __version_info__ = __get_version(__version__, __version_info__)
+#__version__, __version_info__ = __get_version(__version__, __version_info__)
 # This function has executed once, we're done with it. Delete it!
 del __get_version
 # <---- Dynamic/Runtime Salt Version Information ---------------------------------------------------------------------
