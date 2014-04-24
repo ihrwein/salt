@@ -17,7 +17,9 @@ def __virtual__():
     '''
     Only load module if syslog-ng binary is present
     '''
-    return True if salt.utils.which('syslog-ng') else False
+    __SYSLOG_NG_BINARY_PATH = salt.utils.which('syslog-ng')
+    __SYSLOG_NG_CTL_BINARY_PATH = salt.utils.which('syslog-ng-ctl')
+    return True if __SYSLOG_NG_BINARY_PATH else False
 
 #TODO: version refactoralas hogy mashol is lehessen hasznalni
 
