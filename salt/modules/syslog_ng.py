@@ -9,29 +9,29 @@ import logging
 import salt
 import salt.config
 import salt.utils
+import salt.loader
 from salt.exceptions import CommandExecutionError
 
 __virtualname__ = 'syslog_ng'
-
-def __virtual__():
-    '''
-    Only load module if syslog-ng binary is present
-    '''
-    __SYSLOG_NG_BINARY_PATH = salt.utils.which('syslog-ng')
-    __SYSLOG_NG_CTL_BINARY_PATH = salt.utils.which('syslog-ng-ctl')
-    return True if __SYSLOG_NG_BINARY_PATH else False
-
-#TODO: version refactoralas hogy mashol is lehessen hasznalni
-
-log = logging.getLogger(__name__)
-log.setLevel(logging.DEBUG)
-
-class SyslogNGError(Exception): pass
 
 __SYSLOG_NG_SEARCH_PATH = ("/usr", "/usr/local", "/home/tibi/install/syslog-ng")
 __INSTALL_PREFIX = ""
 __SYSLOG_NG_BINARY_PATH = ""
 __SYSLOG_NG_CTL_BINARY_PATH = ""
+
+def __virtual__():
+    '''
+    Only load module if syslog-ng binary is present
+    '''
+    global __SYSLOG_NG_BINARY_PATH, __SYSLOG_NG_CTL_BINARY_PATH
+    __SYSLOG_NG_BINARY_PATH = salt.utils.which('syslog-ng')
+    __SYSLOG_NG_CTL_BINARY_PATH = salt.utils.which('syslog-ng-ctl')
+    return "syslog-ng" if __SYSLOG_NG_BINARY_PATH else False
+
+log = logging.getLogger(__name__)
+log.setLevel(logging.DEBUG)
+
+class SyslogNGError(Exception): pass
 
 def _set_install_prefix(prefix):
     global __INSTALL_PREFIX
@@ -72,19 +72,6 @@ def set_install_prefix(prefixes=()):
     log.error("Unable to find syslog-ng under the given prefixes")
     return False
 
-def __init_module():
-    """
-    At the initialization of module sets the install prefix and binary paths.
-    """
-    set_install_prefix(prefixes=__SYSLOG_NG_SEARCH_PATH)
-    log.debug("Syslog-ng module successfully initialized")
-    log.debug("IP: ", __INSTALL_PREFIX)
-    log.debug("S-NG: ", __SYSLOG_NG_BINARY_PATH)
-    log.debug("S-NG-CTL: ", __SYSLOG_NG_CTL_BINARY_PATH)
-
-__init_module()
-
-
 def new_source():
     pass
 
@@ -99,37 +86,54 @@ def install_prefix():
 
 def _run_command(cmd, options=(), split_at_newlines=True):
     cmd_with_params = (cmd, ) + options
-    print("Cmd to run: ", cmd_with_params)
+    cmd_with_params = " ".join(cmd_with_params)
+    log.debug("Cmd to run: " + cmd_with_params)
 
     try:
-        ret = __salt__['cmd.run_all'](cmd_with_params)
+        ret = __salt__['cmd.run_stdout'](cmd_with_params)
         if split_at_newlines:
             return ret.split("\n")
         else:
             return tuple(ret)
     except Exception as err:
         print(str(err))
-        raise CommandExecutionError("Unable to run command")
+        raise CommandExecutionError("Unable to run command: " + str(type(err)))
 
 def version():
     """
     Returns the version of the installed syslog-ng.
     """
-    lines = _run_command("syslog-ng", options=("-V", ), split_at_newlines=True)
-    #lines = _run_command(__SYSLOG_NG_BINARY_PATH, options=("-V", ), split_at_newlines=True)
+    lines = _run_command(__SYSLOG_NG_BINARY_PATH, options=("-V", ), split_at_newlines=True)
     # The format of the first line in the output is:
     # syslog-ng 3.6.0alpha0
-    version_string = lines[0].split()[1]
-    return version_string
+    version_line_index = 0
+    version_column_index = 1
+    return lines[version_line_index].split()[version_column_index]
 
-def signal():
-    pass
-
-def status():
-    pass
+def modules():
+    """
+    Returns the available modules.
+    """
+    lines = _run_command(__SYSLOG_NG_BINARY_PATH, options=("-V", ), split_at_newlines=True)
+    for i, line in enumerate(lines):
+        if line.startswith("Available-Modules"):
+            label, modules = line.split()
+            return modules
+    return None
 
 def ctl(command="stats"):
     """
         command = (stats, verbose, debug, trace, stop, reload)
     """
-    pass
+    commands = ("stats", "verbose", "debug", "trace", "stop", "reload")
+    if command not in commands:
+        return "The given command '{0}' is not among the supported ones. Please run syslog-ng-ctl for help."
+
+    ret = __salt__['cmd.run_all']( __SYSLOG_NG_CTL_BINARY_PATH + " " + command)
+    if ret["retcode"] == 0:
+        return ret["stdout"]
+    else:
+        return ret["stderr"]
+
+def get_globals():
+    return str(globals())
