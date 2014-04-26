@@ -26,7 +26,7 @@ def __virtual__():
     global __SYSLOG_NG_BINARY_PATH, __SYSLOG_NG_CTL_BINARY_PATH
     __SYSLOG_NG_BINARY_PATH = salt.utils.which('syslog-ng')
     __SYSLOG_NG_CTL_BINARY_PATH = salt.utils.which('syslog-ng-ctl')
-    return "syslog-ng" if __SYSLOG_NG_BINARY_PATH else False
+    return __virtualname__ if __SYSLOG_NG_BINARY_PATH else False
 
 log = logging.getLogger(__name__)
 log.setLevel(logging.DEBUG)
@@ -79,31 +79,33 @@ def new_destination():
     pass
 
 def config_test():
-    pass
+    ret = _run_command("syslog-ng", options=("--syntax-only"))
+    return ret.get("retcode", "None")
 
 def install_prefix():
     return __INSTALL_PREFIX
 
-def _run_command(cmd, options=(), split_at_newlines=True):
-    cmd_with_params = (cmd, ) + options
-    cmd_with_params = " ".join(cmd_with_params)
-    log.debug("Cmd to run: " + cmd_with_params)
+def _run_command(cmd, options=()):
+    cmd_with_params = [cmd]
+    cmd_with_params.extend(options)
+    #cmd_with_params = " ".join(cmd_with_params)
+    #log.debug("Cmd to run: " + cmd_with_params)
 
     try:
-        ret = __salt__['cmd.run_stdout'](cmd_with_params)
-        if split_at_newlines:
-            return ret.split("\n")
-        else:
-            return tuple(ret)
+        return __salt__['cmd.run_all'](cmd_with_params)
     except Exception as err:
-        print(str(err))
+        log.error(str(err))
         raise CommandExecutionError("Unable to run command: " + str(type(err)))
 
 def version():
     """
     Returns the version of the installed syslog-ng.
     """
-    lines = _run_command(__SYSLOG_NG_BINARY_PATH, options=("-V", ), split_at_newlines=True)
+    ret = _run_command("syslog-ng", options=("-V", ))
+    if ret["retcode"] != 0:
+        return "-1"
+
+    lines = ret["stdout"].split("\n")
     # The format of the first line in the output is:
     # syslog-ng 3.6.0alpha0
     version_line_index = 0
@@ -114,7 +116,11 @@ def modules():
     """
     Returns the available modules.
     """
-    lines = _run_command(__SYSLOG_NG_BINARY_PATH, options=("-V", ), split_at_newlines=True)
+    ret = _run_command("syslog-ng", options=("-V", ))
+    if ret["retcode"] != 0:
+        return ""
+
+    lines = ret["stdout"].split("\n")
     for i, line in enumerate(lines):
         if line.startswith("Available-Modules"):
             label, modules = line.split()
@@ -129,11 +135,8 @@ def ctl(command="stats"):
     if command not in commands:
         return "The given command '{0}' is not among the supported ones. Please run syslog-ng-ctl for help."
 
-    ret = __salt__['cmd.run_all']( __SYSLOG_NG_CTL_BINARY_PATH + " " + command)
+    ret = _run_command("syslog-ng-ctl", options=(command,))
     if ret["retcode"] == 0:
-        return ret["stdout"]
+        return ret.get("stdout", "")
     else:
-        return ret["stderr"]
-
-def get_globals():
-    return str(globals())
+        return ret.get("stderr","")
