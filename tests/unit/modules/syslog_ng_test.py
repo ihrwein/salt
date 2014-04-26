@@ -7,10 +7,12 @@ Test module for syslog_ng
 from salttesting import skipIf, TestCase
 from salttesting.helpers import ensure_in_syspath, TestsLoggingHandler
 from salttesting.mock import NO_MOCK, NO_MOCK_REASON, MagicMock, patch
-
+import uuid
 from salt.modules import syslog_ng
+import os
 
 syslog_ng.__salt__ = {}
+syslog_ng.__opts__ = {}
 
 _VERSION = "3.6.0alpha0"
 _MODULES = ("syslogformat,json-plugin,basicfuncs,afstomp,afsocket,cryptofuncs,"
@@ -44,12 +46,6 @@ global;msg_clones;;a;processed;0"""
 @skipIf(NO_MOCK, NO_MOCK_REASON)
 @skipIf(syslog_ng.__virtual__() is False, 'Syslog-ng must be installed')
 class SyslogNGTestCase(TestCase):
-
-    def test_set_install_prefix(self):
-        valid_prefix = "/home/tibi/install/syslog-ng"
-        prefixes = (valid_prefix, "/usr")
-        set_prefix = syslog_ng.set_install_prefix(prefixes)
-        self.assertEqual(set_prefix, valid_prefix)
 
     def test_version(self):
         mock = MagicMock(return_value={"retcode" : 0, 'stdout' : VERSION_OUTPUT})
@@ -92,6 +88,48 @@ class SyslogNGTestCase(TestCase):
                         func_to_call=syslog_ng.modules,
                         func_to_call_args=tuple()
                         )
+
+    def test_prefix(self):
+        expected = "/home/foo/bar/install"
+        with patch.dict(syslog_ng.__opts__, {"syslog_ng.prefix" : expected}):
+            prefix_before_set = syslog_ng.get_prefix()
+            syslog_ng.set_prefix(expected)
+            prefix_after_set = syslog_ng.get_prefix()
+            self.assertEqual(prefix_before_set, "")
+            self.assertEqual(expected, prefix_after_set)
+
+    @patch("salt.modules.syslog_ng._is_config_dir")
+    def test_config_dir(self, mock):
+        mock.return_value = True
+        expected = "/etc/syslog-ng"
+        syslog_ng.set_config_dir(expected)
+        got = syslog_ng.get_config_dir()
+        self.assertEqual(expected, got)
+
+    def test_config_dir_fails(self):
+        expected = "/foo/bar/ssfsdfsdfsdfsdfsdf/sgeh"
+        syslog_ng.set_config_dir(expected)
+        got = syslog_ng.get_config_dir()
+        self.assertNotEqual(expected, got)
+
+    def test_append_config_creates_file(self):
+        filename = "syslog-ng-test-{0}.conf".format(uuid.uuid4().hex[:6])
+        config = """rewrite r_set_syslog_tag {
+                        set-tag(".syslog");
+                    };"""
+        syslog_ng.append_config(config, to_file=filename)
+        with open(filename, "r") as conf_file:
+            content = conf_file.read()
+            self.assertTrue(content.endswith(config))
+        os.remove(filename)
+
+    # def test_append_config_from_file(self):
+    #     config = """parser p_json {
+    #     json-parser(marker("@json:") prefix(".json."));
+    #     };
+    #     """
+    #     syslog_ng.append_config_from_file(from_file=)
+    #     # TODO
 
     def _mock_test(self, expected, mock_func, mock_func_args,
                           func_to_call, func_to_call_args,
