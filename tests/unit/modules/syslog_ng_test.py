@@ -123,13 +123,22 @@ class SyslogNGTestCase(TestCase):
             self.assertTrue(content.endswith(config))
         os.remove(filename)
 
-    # def test_append_config_from_file(self):
-    #     config = """parser p_json {
-    #     json-parser(marker("@json:") prefix(".json."));
-    #     };
-    #     """
-    #     syslog_ng.append_config_from_file(from_file=)
-    #     # TODO
+    def test_append_config_from_file(self):
+        from_file = "syslog-ng-test-{0}.conf".format(uuid.uuid4().hex[:6])
+        to_file = "syslog-ng-test-{0}.conf".format(uuid.uuid4().hex[:6])
+        config = """parser p_json {
+        json-parser(marker("@json:") prefix(".json."));
+        };
+        """
+        with open(from_file, "w") as f:
+            f.write(config)
+
+        syslog_ng.append_config_from_file(from_file=from_file, to_file=to_file)
+        with open(to_file, "r") as conf_file:
+            content = conf_file.read()
+            self.assertTrue(content.endswith(config))
+        os.remove(to_file)
+        os.remove(from_file)
 
     def _mock_test(self, expected, mock_func, mock_func_args,
                           func_to_call, func_to_call_args,

@@ -64,7 +64,16 @@ def append_config(config, to_file="syslog-ng.conf"):
         config_file.write(config)
 
 def append_config_from_file(from_file, to_file="syslog-ng.conf"):
-    pass
+    """
+    Appends the content of from_file to to_file.
+
+    From_file needs to be located on the minion, so before using this command
+    you need to copy it from the master.
+    """
+    config = ""
+    with open(from_file, "r") as config_file:
+        config = config_file.read()
+    append_config(config=config, to_file=to_file)
 
 def _load_module_config():
     """
