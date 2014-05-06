@@ -49,7 +49,7 @@ class SyslogNGTestCase(TestCase):
 
     def test_version(self):
         mock = MagicMock(return_value={"retcode" : 0, 'stdout' : VERSION_OUTPUT})
-        mock_args = ["syslog-ng", "-V"]
+        mock_args = "syslog-ng -V"
         self._mock_test(expected="3.6.0alpha0",
                         mock_func=mock,
                         mock_func_args=mock_args,
@@ -58,9 +58,9 @@ class SyslogNGTestCase(TestCase):
                         )
 
     def test_ctl_fails_when_syslog_ng_doesnt_run(self):
-        mock_args = ["syslog-ng-ctl", "stats"]
+        mock_args = "syslog-ng-ctl stats"
         mock = MagicMock(return_value={"retcode" : 1, 'stdout' : ""})
-        assert_func = lambda x: len(x) == len(STATS_OUTPUT)
+        assert_func = lambda x, y: len(x) == len(STATS_OUTPUT)
         self._mock_test(expected="",
                         mock_func=mock,
                         mock_func_args=mock_args,
@@ -70,7 +70,7 @@ class SyslogNGTestCase(TestCase):
                         )
 
     def test_ctl_stats(self):
-        mock_args = ["syslog-ng-ctl", "stats"]
+        mock_args = "syslog-ng-ctl stats"
         mock = MagicMock(return_value={"retcode" : 0, 'stdout' : ""})
         self._mock_test(expected="",
                         mock_func=mock,
@@ -80,7 +80,7 @@ class SyslogNGTestCase(TestCase):
                         )
 
     def test_modules(self):
-        mock_args = ["syslog-ng", "-V"]
+        mock_args = "syslog-ng -V"
         mock = MagicMock(return_value={"retcode" : 0, 'stdout' : VERSION_OUTPUT})
         self._mock_test(expected=_MODULES,
                         mock_func=mock,
@@ -97,6 +97,17 @@ class SyslogNGTestCase(TestCase):
             prefix_after_set = syslog_ng.get_prefix()
             self.assertEqual(prefix_before_set, "")
             self.assertEqual(expected, prefix_after_set)
+
+    def test_start(self):
+        expected = 0
+        mock_args = "syslog-ng -Fevd"
+        mock = MagicMock(return_value={"retcode" : 0, 'stdout' : ""})
+        self._mock_test(expected=expected,
+                        mock_func=mock,
+                        mock_func_args=mock_args,
+                        func_to_call=syslog_ng.start,
+                        func_to_call_args=("-Fevd",)
+                        )
 
     @patch("salt.modules.syslog_ng._is_config_dir")
     def test_config_dir(self, mock):
@@ -149,7 +160,7 @@ class SyslogNGTestCase(TestCase):
 
         with patch.dict(syslog_ng.__salt__, {'cmd.run_all' : mock_func}):
             got = func_to_call(*func_to_call_args)
-            self.assertEqual(expected, got)
+            assert_func(expected, got)
             mock_func.assert_called_once_with(
                 mock_func_args
             )
